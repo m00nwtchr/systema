@@ -1,7 +1,5 @@
 use std::{
 	collections::{HashMap, hash_map::Entry},
-	hash::Hash,
-	ops::Add,
 	sync::Arc,
 };
 
@@ -10,7 +8,7 @@ use serde::Serialize;
 
 use crate::{
 	attribute::{Attribute, AttributeInstance, AttributeModifier},
-	util_traits::{Key, Number, SerdeSupport},
+	util_traits::{Key, Number},
 };
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -29,8 +27,8 @@ where
 
 impl<A, M, V> AttributeMap<A, M, V>
 where
-	A: Clone + PartialEq + Eq + Hash + SerdeSupport,
-	M: Clone + PartialEq + Eq + Hash + SerdeSupport,
+	A: Key,
+	M: Key,
 	V: Number + 'static,
 {
 	pub fn new(supplier: &'static AttributeSupplier<A, M, V>) -> Self {
