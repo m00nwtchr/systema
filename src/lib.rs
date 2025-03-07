@@ -9,7 +9,7 @@ pub mod prelude {
 		actor::Actor,
 		attribute::{
 			Attribute, AttributeInstance, AttributeModifier, Operation, Value,
-			map::{AttributeSupplier, AttributeSupplierBuilder},
+			supplier::{AttributeSupplier, AttributeSupplierBuilder},
 		},
 		system::System,
 	};

@@ -14,6 +14,7 @@ use crate::{
 };
 
 pub mod map;
+mod supplier;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone)]
@@ -116,14 +117,14 @@ where
 		self.base_value
 	}
 
-	fn set_dirty(&mut self) {
+	fn mark_dirty(&mut self) {
 		self.cached_value.lock().unwrap().take();
 	}
 
 	pub fn set_base_value(&mut self, value: V) {
 		if value != self.base_value {
 			self.base_value = value;
-			self.set_dirty();
+			self.mark_dirty();
 		}
 	}
 
@@ -166,26 +167,32 @@ where
 
 	pub fn add_modifier(&mut self, id: M, modifier: AttributeModifier<A, V>) {
 		self.modifiers.insert(id, modifier);
-		self.set_dirty();
+		self.mark_dirty();
 	}
 
 	pub fn remove_modifier(&mut self, id: &M) -> Option<AttributeModifier<A, V>> {
 		let modifier = self.modifiers.remove(id);
 		if modifier.is_some() {
-			self.set_dirty();
+			self.mark_dirty();
 		}
 		modifier
 	}
 
-	pub fn dependencies(&self) -> Box<[&A]> {
+	// pub fn dependencies(&self) -> Box<[&A]> {
+	// 	self.modifiers
+	// 		.iter()
+	// 		.filter_map(|(_, v)| match &v.value {
+	// 			Value::Value(_) => None,
+	// 			Value::Attribute(a) => Some(a),
+	// 		})
+	// 		.unique()
+	// 		.collect()
+	// }
+
+	pub fn depends_on(&self, attr: &A) -> bool {
 		self.modifiers
-			.iter()
-			.filter_map(|(_, v)| match &v.value {
-				Value::Value(_) => None,
-				Value::Attribute(a) => Some(a),
-			})
-			.unique()
-			.collect()
+			.values()
+			.any(|modifier| modifier.value.is_attribute(attr))
 	}
 }
 
@@ -229,10 +236,19 @@ pub enum Operation<V: 'static> {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum Value<A, V> {
 	Value(V),
 	Attribute(A),
+}
+
+impl<A: PartialEq, V> Value<A, V> {
+	pub fn is_attribute(&self, attr: &A) -> bool {
+		match self {
+			Self::Attribute(a) => a.eq(attr),
+			_ => false,
+		}
+	}
 }
 
 impl<A, V: Number> From<V> for Value<A, V> {
