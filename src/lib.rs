@@ -1,92 +1,185 @@
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::sync::Arc;
-
-use crate::serde_support::SerdeSupport;
-
 mod actor;
 mod attribute;
 mod holder;
-mod serde_support;
-
-use crate::actor::Actor;
-use crate::attribute::map::AttributeSupplier;
-use crate::holder::AttributeResource;
-use attribute::map::AttributeMap;
+mod system;
+mod util_traits;
 
 pub mod prelude {
-	pub use super::System;
-	pub use crate::actor::Actor;
-	pub use crate::attribute::map::{AttributeSupplier, AttributeSupplierBuilder};
-	pub use crate::attribute::{Attribute, AttributeInstance, AttributeModifier, Operation, Value};
+	pub use crate::{
+		actor::Actor,
+		attribute::{
+			Attribute, AttributeInstance, AttributeModifier, Operation, Value,
+			map::{AttributeSupplier, AttributeSupplierBuilder},
+		},
+		system::System,
+	};
+
+	pub type AttributeMap<S> = crate::attribute::map::AttributeMap<
+		<S as System>::AttributeKey,
+		<S as System>::ModifierKey,
+		<S as System>::AttributeValue,
+	>;
 }
-
-pub trait System
-
-{
-	// actor_attributes: Arc<HashMap<A, Attribute>>,
-	// attribute_suppliers: HashMap<AT, Arc<AttributeSupplier<A, M>>>,
-	type Actor: Actor;
-
-   fn new_actor(&self, kind: <<Self as System>::Actor as Actor>::Kind) -> Self::Actor;
-}
-//
-// impl<AT, A, M> System<AT, A, M>
-// where
-// 	AT: PartialEq + Eq + Hash,
-// 	A: Clone + PartialEq + Eq + Hash + SerdeSupport,
-// 	M: Clone + PartialEq + Eq + Hash + SerdeSupport,
-// {
-// 	pub fn new(suppliers: HashMap<AT, Arc<AttributeSupplier<A, M>>>) -> Self {
-// 		Self {
-// 			attribute_suppliers: suppliers,
-// 		}
-// 	}
-//
-// 	pub fn new_actor(&self, kind: &AT) -> Actor<A, M> {
-// 		Actor {
-// 			attributes: AttributeMap::new(self.attribute_suppliers.get(kind).expect(" ").clone()),
-// 		}
-// 	}
-// }
 
 #[cfg(test)]
 mod tests {
-	use super::prelude::*;
-	use std::collections::HashMap;
-	use std::sync::Arc;
 	use once_cell::sync::Lazy;
 	#[cfg(feature = "serde")]
 	use serde::{Deserialize, Serialize};
+
+	use super::prelude::*;
 	use crate::attribute::map::AttributeMap;
-	use crate::holder::AttributeResource;
 
 	static ATTRIBUTES: Lazy<AttributeSupplier<AttributeKey, ModifierKey>> = Lazy::new(|| {
-	AttributeSupplier::builder()
-			.add(
-				AttributeKey::MaxHealth,
-				Attribute::Ranged(20.0, 0.0, 1024.0),
+		AttributeSupplier::builder()
+			.create(AttributeKey::MaxHealth, Attribute::Ranged(0.0, 1.0, 1024.0))
+			.modifier(
+				ModifierKey::Attribute(AttributeKey::Stamina),
+				AttributeModifier::new(Value::Attribute(AttributeKey::Stamina), Operation::Add),
 			)
-			.add(AttributeKey::Speed, Attribute::Value(5.0))
-			.add(AttributeKey::Strength, Attribute::Value(2.0))
-			.add(AttributeKey::Dexterity, Attribute::Value(2.0))
+			.modifier(
+				ModifierKey::Attribute(AttributeKey::Size),
+				AttributeModifier::new(Value::Attribute(AttributeKey::Size), Operation::Add),
+			)
+			.insert()
+			.create(AttributeKey::Speed, Attribute::Value(5.0))
+			.modifier(
+				ModifierKey::Attribute(AttributeKey::Dexterity),
+				AttributeModifier::new(Value::Attribute(AttributeKey::Dexterity), Operation::Add),
+			)
+			.modifier(
+				ModifierKey::Attribute(AttributeKey::Strength),
+				AttributeModifier::new(Value::Attribute(AttributeKey::Strength), Operation::Add),
+			)
+			.insert()
+			.add(AttributeKey::Size, Attribute::Value(5.0))
+			.add(AttributeKey::Stamina, Attribute::Value(1.0))
+			.add(AttributeKey::Strength, Attribute::Value(1.0))
+			.add(AttributeKey::Dexterity, Attribute::Value(1.0))
 			.build()
 	});
 
 	struct MockActor {
 		pub attributes: AttributeMap<AttributeKey, ModifierKey>,
+		pub form: Option<Form>,
 	}
-	impl Actor for MockActor {
-		type Kind = ActorKind;
-		type AttributeKey = AttributeKey;
-		type ModifierKey = ModifierKey;
+	impl MockActor {
+		pub fn set_form(&mut self, form: Form) {
+			if let Some(form_mut) = self.form.as_mut() {
+				let old_form = std::mem::replace(form_mut, form);
+				self.attributes
+					.remove_modifiers(&ModifierKey::Form(old_form));
 
-		fn new(kind: ActorKind) -> Self {
-			Self {
-				attributes: AttributeMap::new(&ATTRIBUTES)
+				match form_mut {
+					Form::Hishu => {}
+					Form::Dalu => {
+						self.attributes
+							.add_modifier(
+								AttributeKey::Strength,
+								ModifierKey::Form(Form::Dalu),
+								AttributeModifier::new(Value::Value(1.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Stamina,
+								ModifierKey::Form(Form::Dalu),
+								AttributeModifier::new(Value::Value(1.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Size,
+								ModifierKey::Form(Form::Dalu),
+								AttributeModifier::new(Value::Value(1.0), Operation::Add),
+							);
+					}
+					Form::Gauru => {
+						self.attributes
+							.add_modifier(
+								AttributeKey::Strength,
+								ModifierKey::Form(Form::Gauru),
+								AttributeModifier::new(Value::Value(3.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Dexterity,
+								ModifierKey::Form(Form::Gauru),
+								AttributeModifier::new(Value::Value(1.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Stamina,
+								ModifierKey::Form(Form::Gauru),
+								AttributeModifier::new(Value::Value(2.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Size,
+								ModifierKey::Form(Form::Gauru),
+								AttributeModifier::new(Value::Value(2.0), Operation::Add),
+							);
+					}
+					Form::Urhan => {
+						self.attributes
+							.add_modifier(
+								AttributeKey::Dexterity,
+								ModifierKey::Form(Form::Urhan),
+								AttributeModifier::new(Value::Value(2.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Stamina,
+								ModifierKey::Form(Form::Urhan),
+								AttributeModifier::new(Value::Value(1.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Size,
+								ModifierKey::Form(Form::Urhan),
+								AttributeModifier::new(Value::Value(-1.0), Operation::Add),
+							);
+					}
+					Form::Urshul => {
+						self.attributes
+							.add_modifier(
+								AttributeKey::Strength,
+								ModifierKey::Form(Form::Urshul),
+								AttributeModifier::new(Value::Value(2.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Dexterity,
+								ModifierKey::Form(Form::Urshul),
+								AttributeModifier::new(Value::Value(2.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Stamina,
+								ModifierKey::Form(Form::Urshul),
+								AttributeModifier::new(Value::Value(2.0), Operation::Add),
+							)
+							.add_modifier(
+								AttributeKey::Size,
+								ModifierKey::Form(Form::Urshul),
+								AttributeModifier::new(Value::Value(1.0), Operation::Add),
+							);
+					}
+				}
 			}
 		}
-		
+	}
+	impl Actor for MockActor {
+		type System = MockSystem;
+		type Kind = ActorKind;
+
+		fn new(kind: ActorKind) -> Self {
+			let mut _self = Self {
+				attributes: AttributeMap::new(&ATTRIBUTES),
+				form: if matches!(kind, ActorKind::Werewolf) {
+					Some(Form::Hishu)
+				} else {
+					None
+				},
+			};
+
+			match kind {
+				ActorKind::Wizard => {}
+				ActorKind::Werewolf => _self.set_form(Form::Hishu),
+			}
+
+			_self
+		}
+
 		fn attributes(&self) -> &AttributeMap<AttributeKey, ModifierKey> {
 			&self.attributes
 		}
@@ -96,21 +189,14 @@ mod tests {
 		}
 	}
 
-	struct MockSystem {
+	struct MockSystem;
 
-	}
-
-	impl MockSystem {
-		fn new() -> Self {
-			Self {}
-		}
-	}
 	impl System for MockSystem {
-		type Actor = MockActor;
+		type AttributeKey = AttributeKey;
+		type ModifierKey = ModifierKey;
+		type AttributeValue = f32;
 
-		fn new_actor(&self, kind: ActorKind) -> Self::Actor {
-			Self::Actor::new(kind)
-		}
+		type Actor = MockActor;
 	}
 
 	#[derive(PartialEq, Eq, Hash)]
@@ -126,78 +212,50 @@ mod tests {
 		MaxHealth,
 		Speed,
 
+		Size,
+
+		Stamina,
 		Strength,
 		Dexterity,
+		// Form,
+	}
+
+	#[derive(PartialEq, Eq, Hash, Clone)]
+	#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+	pub enum Form {
+		Hishu,
+		Dalu,
+		Gauru,
+		Urhan,
+		Urshul,
 	}
 
 	#[derive(PartialEq, Eq, Hash, Clone)]
 	#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 	pub enum ModifierKey {
-		GauruForm,
+		Form(Form),
 
 		Attribute(AttributeKey),
 	}
 
 	#[test]
 	fn wwww() {
+		println!("{}", std::mem::size_of::<MockActor>());
 		println!("{}", std::mem::size_of::<Box<[&AttributeKey]>>());
 		println!("{}", std::mem::size_of::<Vec<&AttributeKey>>());
 	}
 
 	#[test]
 	fn it_works() {
-		// HashMap::from([
-		// 	(
-		// 		AttributeKey::MaxHealth,
-		// 		Attribute::Ranged(20.0, 0.0, 1024.0),
-		// 	),
-		// 	(AttributeKey::Speed, Attribute::Value(5.0)),
-		// ])
+		let mut actor = MockActor::new(ActorKind::Werewolf);
+		assert_eq!(Some(6.0), actor.attributes.value(&AttributeKey::MaxHealth));
 
-		let system = MockSystem::new();
+		actor.set_form(Form::Gauru);
+		assert_eq!(Some(10.0), actor.attributes.value(&AttributeKey::MaxHealth));
 
-		// let system: MockSystem = System::new(HashMap::from([(
-		// 	ActorKind::Werewolf,
-		// 	Arc::new(
-		// 		AttributeSupplier::builder()
-		// 			.add(
-		// 				AttributeKey::MaxHealth,
-		// 				Attribute::Ranged(20.0, 0.0, 1024.0),
-		// 			)
-		// 			.add(AttributeKey::Speed, Attribute::Value(5.0))
-		// 			.add(AttributeKey::Strength, Attribute::Value(2.0))
-		// 			.add(AttributeKey::Dexterity, Attribute::Value(2.0))
-		// 			.build(),
-		// 	),
-		// )]));
-
-		let mut actor = system.new_actor(ActorKind::Werewolf);
-		assert_eq!(Some(20.0), actor.attributes.value(&AttributeKey::MaxHealth));
-
-		actor.attributes.add_modifier(
-			AttributeKey::MaxHealth,
-			ModifierKey::GauruForm,
-			AttributeModifier::new(2.0, Operation::Add),
-		);
-		assert_eq!(Some(22.0), actor.attributes.value(&AttributeKey::MaxHealth));
-
-		actor
-			.attributes
-			.set_base_value(AttributeKey::MaxHealth, 5.0);
-		assert_eq!(Some(7.0), actor.attributes.value(&AttributeKey::MaxHealth));
-
-		// let speed = actor.attributes.attribute_mut(AttributeKey::Speed).unwrap();
-		actor.attributes.add_modifier(
-			AttributeKey::Speed,
-			ModifierKey::Attribute(AttributeKey::Dexterity),
-			AttributeModifier::new(Value::Attribute(AttributeKey::Dexterity), Operation::Add),
-		);
-		actor.attributes.add_modifier(
-			AttributeKey::Speed,
-			ModifierKey::Attribute(AttributeKey::Strength),
-			AttributeModifier::new(Value::Attribute(AttributeKey::Strength), Operation::Add),
-		);
-
-		assert_eq!(actor.attributes.value(&AttributeKey::Speed), Some(9.0))
+		actor.set_form(Form::Hishu);
+		assert_eq!(actor.attributes.value(&AttributeKey::Dexterity), Some(1.0));
+		assert_eq!(actor.attributes.value(&AttributeKey::Strength), Some(1.0));
+		assert_eq!(actor.attributes.value(&AttributeKey::Speed), Some(7.0))
 	}
 }

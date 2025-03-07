@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/sos.iml" filepath="$PROJECT_DIR$/.idea/sos.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/systema.iml" filepath="$PROJECT_DIR$/.idea/systema.iml" />
     </modules>
   </component>
 </project>

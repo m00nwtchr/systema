@@ -62,15 +62,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sos"
-version = "0.1.0"
-dependencies = [
- "itertools",
- "once_cell",
- "serde",
-]
-
-[[package]]
 name = "syn"
 version = "2.0.99"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -79,6 +70,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "systema"
+version = "0.1.0"
+dependencies = [
+ "itertools",
+ "once_cell",
+ "serde",
 ]
 
 [[package]]
