@@ -1,32 +1,13 @@
-use std::{
-	cmp::Ordering,
-	collections::HashMap,
-	sync::{Arc, Mutex},
-};
+use std::cmp::Ordering;
 
-use itertools::Itertools;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use crate::util_traits::Number;
 
-use crate::{
-	attribute::map::AttributeMap,
-	util_traits::{Key, Number},
-};
-
+pub mod instance;
 pub mod map;
-mod supplier;
+pub mod modifier;
+pub mod supplier;
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone)]
-pub enum Attribute<V = f32>
-where
-	V: Number + 'static,
-{
-	Value(V),
-	Ranged(V, V, V),
-}
-
-pub fn clamp<T: PartialOrd + Copy>(value: T, min: T, max: T) -> T {
+pub fn clamp<T: PartialOrd>(value: T, min: T, max: T) -> T {
 	// value is NaN or less than min
 	match value.partial_cmp(&min) {
 		None | Some(Ordering::Less) => min,
@@ -40,14 +21,26 @@ pub fn clamp<T: PartialOrd + Copy>(value: T, min: T, max: T) -> T {
 	}
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone)]
+pub enum Attribute<V = f32>
+where
+	V: Number + 'static,
+{
+	Value(V),
+	Ranged(V, V, V),
+	Derived,
+}
+
 impl<V> Attribute<V>
 where
 	V: Number + 'static,
 {
 	pub fn default_value(&self) -> V {
 		match self {
-			Attribute::Value(d) => *d,
-			Attribute::Ranged(d, _, _) => *d,
+			Self::Value(d) => *d,
+			Self::Ranged(d, _, _) => *d,
+			Self::Derived => V::default(),
 		}
 	}
 
@@ -55,220 +48,59 @@ where
 		match self {
 			Self::Value(_) => value,
 			Self::Ranged(_, min, max) => clamp(value, *min, *max),
+			Self::Derived => value,
 		}
 	}
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
-// #[derive(Clone)]
-pub struct AttributeInstance<A, M, V = f32>
-where
-	A: Key,
-	M: Key,
-	V: Number + 'static,
-{
-	#[cfg_attr(feature = "serde", serde(skip))]
-	attribute: Arc<Attribute<V>>,
-	#[cfg_attr(feature = "serde", serde(skip))]
-	modifiers: HashMap<M, AttributeModifier<A, V>>,
+#[cfg(test)]
+mod tests {
+	use super::*;
 
-	base_value: V,
-	#[cfg_attr(feature = "serde", serde(skip))]
-	cached_value: Mutex<Option<V>>,
-	// on_dirty: Box<dyn FnMut()>,
-}
-impl<A, M, V> Clone for AttributeInstance<A, M, V>
-where
-	A: Key,
-	M: Key,
-	V: Number + 'static,
-{
-	fn clone(&self) -> Self {
-		Self {
-			attribute: self.attribute.clone(),
-			modifiers: self.modifiers.clone(),
-			base_value: self.base_value,
-			cached_value: Mutex::new(*self.cached_value.lock().unwrap()),
-		}
-	}
-}
-
-impl<A, M, V> AttributeInstance<A, M, V>
-where
-	M: Key,
-	A: Key,
-	V: Number + 'static,
-{
-	pub fn new(
-		attribute: Arc<Attribute<V>>,
-		// on_dirty: Box<dyn Fn(&A)>
-	) -> Self {
-		let base_value = attribute.default_value();
-		Self {
-			attribute,
-			modifiers: HashMap::default(),
-			base_value,
-			cached_value: Mutex::new(None),
-			// on_dirty
-		}
+	#[test]
+	fn test_clamp_within_range() {
+		assert_eq!(clamp(5, 1, 10), 5);
 	}
 
-	pub fn base_value(&self) -> V {
-		self.base_value
+	#[test]
+	fn test_clamp_below_min() {
+		assert_eq!(clamp(0, 1, 10), 1);
 	}
 
-	fn mark_dirty(&mut self) {
-		self.cached_value.lock().unwrap().take();
+	#[test]
+	fn test_clamp_above_max() {
+		assert_eq!(clamp(15, 1, 10), 10);
 	}
 
-	pub fn set_base_value(&mut self, value: V) {
-		if value != self.base_value {
-			self.base_value = value;
-			self.mark_dirty();
-		}
+	#[test]
+	fn test_clamp_float_nan() {
+		let nan: f32 = f32::NAN;
+		assert_eq!(1.0, clamp(nan, 1.0, 10.0)); // Maybe should pass the NaN instead?
 	}
 
-	fn compute_value(&self, attributes: &AttributeMap<A, M, V>) -> V {
-		let mut value = self.base_value;
+	#[test]
+	fn test_attribute_default_value() {
+		let attr_value = Attribute::Value(42);
+		assert_eq!(attr_value.default_value(), 42);
 
-		for modifier in self.modifiers.values() {
-			let mod_val = match &modifier.value {
-				Value::Value(val) => *val,
-				Value::Attribute(attr) => attributes.value(attr).unwrap_or_default(),
-			};
+		let attr_ranged = Attribute::Ranged(5, 1, 10);
+		assert_eq!(attr_ranged.default_value(), 5);
 
-			value = match &modifier.op {
-				Operation::Add => value + mod_val,
-				Operation::Fn(f) => f(value, mod_val),
-			};
-		}
-
-		self.attribute.sanitize_value(value)
+		let attr_derived: Attribute<i32> = Attribute::Derived;
+		assert_eq!(attr_derived.default_value(), 0);
 	}
 
-	pub fn value(&self, attributes: &AttributeMap<A, M, V>) -> V {
-		let mut cached_value = self.cached_value.lock().unwrap();
-		match *cached_value {
-			None => {
-				let val = self.compute_value(attributes);
-				cached_value.replace(val);
-				val
-			}
-			Some(val) => val,
-		}
-	}
+	#[test]
+	fn test_attribute_sanitize_value() {
+		let attr_value = Attribute::Value(42);
+		assert_eq!(attr_value.sanitize_value(50), 50);
 
-	pub fn has_modifier(&self, modifier: &M) -> bool {
-		self.modifiers.contains_key(modifier)
-	}
-	pub fn modifier(&self, modifier: &M) -> Option<&AttributeModifier<A, V>> {
-		self.modifiers.get(modifier)
-	}
+		let attr_ranged = Attribute::Ranged(5, 1, 10);
+		assert_eq!(attr_ranged.sanitize_value(0), 1);
+		assert_eq!(attr_ranged.sanitize_value(7), 7);
+		assert_eq!(attr_ranged.sanitize_value(15), 10);
 
-	pub fn add_modifier(&mut self, id: M, modifier: AttributeModifier<A, V>) {
-		self.modifiers.insert(id, modifier);
-		self.mark_dirty();
-	}
-
-	pub fn remove_modifier(&mut self, id: &M) -> Option<AttributeModifier<A, V>> {
-		let modifier = self.modifiers.remove(id);
-		if modifier.is_some() {
-			self.mark_dirty();
-		}
-		modifier
-	}
-
-	// pub fn dependencies(&self) -> Box<[&A]> {
-	// 	self.modifiers
-	// 		.iter()
-	// 		.filter_map(|(_, v)| match &v.value {
-	// 			Value::Value(_) => None,
-	// 			Value::Attribute(a) => Some(a),
-	// 		})
-	// 		.unique()
-	// 		.collect()
-	// }
-
-	pub fn depends_on(&self, attr: &A) -> bool {
-		self.modifiers
-			.values()
-			.any(|modifier| modifier.value.is_attribute(attr))
-	}
-}
-
-impl<A, M> Default for AttributeInstance<A, M>
-where
-	M: Key,
-	A: Key,
-{
-	fn default() -> Self {
-		AttributeInstance::new(Arc::new(Attribute::Value(0.0)))
-	}
-}
-
-pub trait CloneableFn<V>: Fn(V, V) -> V + Send + Sync {
-	fn clone_box<'a>(&self) -> Box<dyn 'a + CloneableFn<V>>
-	where
-		Self: 'a;
-}
-impl<F, V> CloneableFn<V> for F
-where
-	F: Fn(V, V) -> V + Clone + Send + Sync,
-{
-	fn clone_box<'a>(&self) -> Box<dyn 'a + CloneableFn<V>>
-	where
-		Self: 'a,
-	{
-		Box::new(self.clone())
-	}
-}
-impl<'a, V: 'a> Clone for Box<dyn 'a + CloneableFn<V>> {
-	fn clone(&self) -> Self {
-		(**self).clone_box()
-	}
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone)]
-pub enum Operation<V: 'static> {
-	Add,
-	Fn(Box<dyn CloneableFn<V>>),
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Eq, PartialEq)]
-pub enum Value<A, V> {
-	Value(V),
-	Attribute(A),
-}
-
-impl<A: PartialEq, V> Value<A, V> {
-	pub fn is_attribute(&self, attr: &A) -> bool {
-		match self {
-			Self::Attribute(a) => a.eq(attr),
-			_ => false,
-		}
-	}
-}
-
-impl<A, V: Number> From<V> for Value<A, V> {
-	fn from(value: V) -> Self {
-		Self::Value(value)
-	}
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone)]
-pub struct AttributeModifier<A, V: 'static> {
-	value: Value<A, V>,
-	op: Operation<V>,
-}
-
-impl<A, V> AttributeModifier<A, V> {
-	pub fn new<I: Into<Value<A, V>>>(value: I, op: Operation<V>) -> Self {
-		Self {
-			value: value.into(),
-			op,
-		}
+		let attr_derived = Attribute::Derived;
+		assert_eq!(attr_derived.sanitize_value(99), 99);
 	}
 }

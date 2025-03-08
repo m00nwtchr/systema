@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::{
-	attribute::{Attribute, AttributeInstance, AttributeModifier, map::AttributeMap},
+	attribute::{instance::AttributeInstance, map::AttributeMap},
 	util_traits::{Key, Number},
 };
 
@@ -11,7 +11,6 @@ where
 	M: Key + 'static,
 	V: Number + 'static,
 {
-	// attributes: HashMap<A, Arc<Attribute>>,
 	instances: HashMap<A, AttributeInstance<A, M, V>>,
 }
 
@@ -23,32 +22,16 @@ where
 {
 	pub fn build(self) -> AttributeSupplier<A, M, V> {
 		AttributeSupplier {
-			// attributes: self.attributes,
 			instances: self.instances,
 		}
 	}
 
-	pub fn add<I: Into<A>>(mut self, id: I, attribute: Attribute<V>) -> Self {
-		self.instances
-			.insert(id.into(), AttributeInstance::new(Arc::new(attribute)));
-		self
-	}
-
-	pub fn create<I: Into<A>>(self, id: I, attribute: Attribute<V>) -> AttributeBuilder<A, M, V> {
-		AttributeBuilder {
-			asb: self,
-			id: id.into(),
-			attribute: Arc::new(attribute),
-			modifiers: HashMap::new(),
-		}
-	}
-
-	pub fn add_instance<I: Into<A>>(
+	pub fn add<I: Into<A>, AI: Into<AttributeInstance<A, M, V>>>(
 		mut self,
 		id: I,
-		attribute: AttributeInstance<A, M, V>,
+		attribute: AI,
 	) -> Self {
-		self.instances.insert(id.into(), attribute);
+		self.instances.insert(id.into(), attribute.into());
 		self
 	}
 }
@@ -59,7 +42,6 @@ where
 	M: Key,
 	V: Number + 'static,
 {
-	// attributes: HashMap<A, Arc<Attribute>>,
 	instances: HashMap<A, AttributeInstance<A, M, V>>,
 }
 
@@ -71,7 +53,6 @@ where
 {
 	pub fn builder() -> AttributeSupplierBuilder<A, M, V> {
 		AttributeSupplierBuilder {
-			// attributes: HashMap::new(),
 			instances: HashMap::new(),
 		}
 	}
@@ -80,47 +61,131 @@ where
 		self.instances.get(attribute).cloned()
 	}
 
-	pub(crate) fn has_attribute(&self, attribute: &A) -> bool {
-		self.instances.contains_key(attribute)
-	}
+	// pub(crate) fn has_attribute(&self, attribute: &A) -> bool {
+	// 	self.instances.contains_key(attribute)
+	// }
 
 	pub(crate) fn value(&self, attribute: &A, attributes: &AttributeMap<A, M, V>) -> Option<V> {
 		self.instances
 			.get(attribute)
-			.map(|attr| attr.compute_value(attributes))
+			.map(|attr| attr.compute_value(attributes, false))
 	}
-	pub(crate) fn base_value(&self, attribute: &A) -> Option<V> {
-		self.instances.get(attribute).map(|attr| attr.base_value())
+
+	pub(crate) fn base_value(
+		&self,
+		attribute: &A,
+		attributes: &AttributeMap<A, M, V>,
+	) -> Option<V> {
+		self.instances
+			.get(attribute)
+			.map(|attr| attr.compute_value(attributes, true))
 	}
+	// pub(crate) fn raw_value(&self, attribute: &A) -> Option<V> {
+	// 	self.instances.get(attribute).map(|attr| attr.raw_value())
+	// }
 }
 
-pub struct AttributeBuilder<A, M, V = f32>
-where
-	A: Key + 'static,
-	M: Key + 'static,
-	V: Number + 'static,
-{
-	asb: AttributeSupplierBuilder<A, M, V>,
-	id: A,
-	attribute: Arc<Attribute<V>>,
-	modifiers: HashMap<M, AttributeModifier<A, V>>,
-}
-
-impl<A, M, V> AttributeBuilder<A, M, V>
+impl<A, M, V> Default for AttributeSupplier<A, M, V>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
 {
-	pub fn modifier(mut self, key: M, modifier: AttributeModifier<A, V>) -> Self {
-		self.modifiers.insert(key, modifier);
-		self
+	fn default() -> Self {
+		Self {
+			instances: HashMap::new(),
+		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use std::sync::Arc;
+
+	use super::*;
+	use crate::prelude::{Attribute, AttributeModifier, Operation};
+
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	enum TestAttribute {
+		Strength,
+		Agility,
 	}
 
-	pub fn insert(self) -> AttributeSupplierBuilder<A, M, V> {
-		let mut ai = AttributeInstance::new(self.attribute);
-		ai.modifiers = self.modifiers;
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	enum TestModifier {
+		Buff,
+	}
 
-		self.asb.add_instance(self.id, ai)
+	type MockSupplier = AttributeSupplier<TestAttribute, TestModifier, f32>;
+
+	fn mock_supplier() -> Arc<MockSupplier> {
+		Arc::new(
+			MockSupplier::builder()
+				.add(
+					TestAttribute::Strength,
+					AttributeInstance::builder(Attribute::Value(1.0)).modifier(
+						TestModifier::Buff,
+						AttributeModifier::new(1.0, Operation::Add),
+					),
+				)
+				.add(TestAttribute::Agility, Attribute::Value(2.0))
+				.build(),
+		)
+	}
+
+	#[test]
+	fn test_supplier_builder() {
+		let supplier = mock_supplier();
+
+		assert_eq!(supplier.instances.len(), 2);
+		assert!(supplier.instances.contains_key(&TestAttribute::Strength));
+		assert!(supplier.instances.contains_key(&TestAttribute::Agility));
+	}
+
+	#[test]
+	fn test_create_instance() {
+		let supplier = Arc::new(
+			MockSupplier::builder()
+				.add(TestAttribute::Strength, Attribute::Value(1.0))
+				.build(),
+		);
+
+		let instance = supplier.create_instance(&TestAttribute::Strength);
+		assert!(instance.is_some());
+		assert_eq!(
+			instance
+				.unwrap()
+				.compute_value(&AttributeMap::default(), false),
+			1.0
+		);
+
+		let instance_none = supplier.create_instance(&TestAttribute::Agility);
+		assert!(instance_none.is_none());
+	}
+
+	#[test]
+	fn test_value_computation() {
+		let supplier = mock_supplier();
+
+		let value = supplier.value(&TestAttribute::Strength, &AttributeMap::default());
+		assert_eq!(value, Some(2.0));
+
+		let base_value = supplier.base_value(&TestAttribute::Strength, &AttributeMap::default());
+		assert_eq!(base_value, Some(1.0));
+	}
+
+	#[test]
+	fn test_value_not_found() {
+		let supplier = MockSupplier::default();
+
+		// Testing for an attribute not in the supplier
+		let non_existent_value = supplier.value(&TestAttribute::Agility, &AttributeMap::default());
+		assert_eq!(non_existent_value, None);
+	}
+
+	#[test]
+	fn test_default_supplier() {
+		let supplier: MockSupplier = Default::default();
+		assert!(supplier.instances.is_empty());
 	}
 }

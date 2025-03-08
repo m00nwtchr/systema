@@ -1,4 +1,7 @@
-use std::hash::Hash;
+use std::{
+	hash::Hash,
+	ops::{Add, Sub},
+};
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, de::DeserializeOwned};
@@ -19,7 +22,8 @@ pub trait Number:
 	+ PartialEq
 	+ PartialOrd
 	+ Default
-	+ std::ops::Add<Self, Output = Self>
+	+ Add<Self, Output = Self>
+	+ Sub<Self, Output = Self>
 	+ 'static
 {
 }
@@ -30,7 +34,8 @@ impl<T> Number for T where
 		+ PartialEq
 		+ PartialOrd
 		+ Default
-		+ std::ops::Add<Self, Output = Self>
+		+ Add<Self, Output = Self>
+		+ Sub<Self, Output = Self>
 		+ 'static
 {
 }

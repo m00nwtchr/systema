@@ -1,15 +1,16 @@
-use std::collections::{HashMap, hash_map::Entry};
-
-use itertools::Itertools;
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use std::{
+	collections::{HashMap, hash_map::Entry},
+	sync::Arc,
+};
 
 use crate::{
-	attribute::{AttributeInstance, AttributeModifier, Value, supplier::AttributeSupplier},
+	attribute::{
+		instance::AttributeInstance, modifier::AttributeModifier, supplier::AttributeSupplier,
+	},
 	util_traits::{Key, Number},
 };
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AttributeMap<A, M, V = f32>
 where
 	A: Key + 'static,
@@ -17,7 +18,7 @@ where
 	V: Number + 'static,
 {
 	#[cfg_attr(feature = "serde", serde(skip))]
-	supplier: &'static AttributeSupplier<A, M, V>,
+	supplier: Option<Arc<AttributeSupplier<A, M, V>>>,
 	attributes: HashMap<A, AttributeInstance<A, M, V>>,
 }
 
@@ -27,9 +28,9 @@ where
 	M: Key,
 	V: Number + 'static,
 {
-	pub fn new(supplier: &'static AttributeSupplier<A, M, V>) -> Self {
+	pub fn new(supplier: Arc<AttributeSupplier<A, M, V>>) -> Self {
 		AttributeMap {
-			supplier,
+			supplier: Some(supplier),
 			attributes: HashMap::new(),
 		}
 	}
@@ -52,20 +53,41 @@ where
 	) -> &mut Self {
 		if let Some(attr) = self.get_mut(attribute.clone()) {
 			attr.add_modifier(modifier, instance);
+			self.mark_dependents_dirty(&attribute);
 		}
 
 		self
 	}
 
-	pub fn remove_modifiers(&mut self, modifier: &M) {
-		for attr in self.attributes.values_mut() {
+	pub fn remove_modifier(&mut self, attribute: &A, modifier: &M) {
+		if let Some(attr) = self.attributes.get_mut(attribute) {
 			attr.remove_modifier(modifier);
+			self.mark_dependents_dirty(attribute);
 		}
 	}
 
-	pub fn set_base_value(&mut self, attribute: A, value: V) {
-		if let Some(attr) = self.get_mut(attribute) {
-			attr.set_base_value(value)
+	pub fn remove_modifiers(&mut self, modifier: &M) {
+		let v: Box<[A]> = self
+			.attributes
+			.iter_mut()
+			.filter_map(|(id, attr)| {
+				if attr.remove_modifier(modifier) {
+					Some(id.clone())
+				} else {
+					None
+				}
+			})
+			.collect();
+
+		for id in v {
+			self.mark_dependents_dirty(&id);
+		}
+	}
+
+	pub fn set_raw_value(&mut self, attribute: A, value: V) {
+		if let Some(attr) = self.get_mut(attribute.clone()) {
+			attr.set_raw_value(value);
+			self.mark_dependents_dirty(&attribute);
 		}
 	}
 
@@ -73,22 +95,31 @@ where
 		self.attributes
 			.get(attribute)
 			.map(|attr| attr.value(self))
-			.or_else(|| self.supplier.value(attribute, self))
+			.or_else(|| {
+				self.supplier
+					.as_ref()
+					.and_then(|s| s.value(attribute, self))
+			})
 	}
 	pub fn base_value(&self, attribute: &A) -> Option<V> {
 		self.attributes
 			.get(attribute)
-			.map(AttributeInstance::base_value)
-			.or_else(|| self.supplier.base_value(attribute))
+			.map(|attr| attr.base_value(self))
+			.or_else(|| {
+				self.supplier
+					.as_ref()
+					.and_then(|s| s.base_value(attribute, self))
+			})
 	}
 
-	fn mark_dependents_dirty(&mut self, id: &A) {
-		for attrs in self
+	fn mark_dependents_dirty(&self, id: &A) {
+		for (id, attr) in self
 			.attributes
-			.values_mut()
-			.filter(|attr| attr.depends_on(id))
+			.iter()
+			.filter(|(_, attr)| attr.depends_on(id))
 		{
-			attrs.mark_dirty();
+			attr.mark_dirty();
+			self.mark_dependents_dirty(id);
 		}
 	}
 
@@ -103,8 +134,140 @@ where
 			}
 			Entry::Vacant(e) => self
 				.supplier
-				.create_instance(e.key())
+				.as_ref()
+				.and_then(|s| s.create_instance(e.key()))
 				.map(|attr| e.insert(attr)),
 		}
+	}
+}
+
+impl<A, M, V> Default for AttributeMap<A, M, V>
+where
+	A: Key,
+	M: Key,
+	V: Number + 'static,
+{
+	fn default() -> Self {
+		AttributeMap {
+			supplier: None,
+			attributes: HashMap::new(),
+		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use once_cell::sync::Lazy;
+
+	use super::*;
+	use crate::prelude::{Attribute, Operation};
+
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	enum TestAttribute {
+		Strength,
+		Agility,
+	}
+
+	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	enum TestModifier {
+		Buff,
+	}
+
+	type MockSupplier = AttributeSupplier<TestAttribute, TestModifier, f32>;
+	type MockMap = AttributeMap<TestAttribute, TestModifier, f32>;
+
+	static ATTRIBUTES: Lazy<Arc<MockSupplier>> = Lazy::new(|| {
+		Arc::new(
+			MockSupplier::builder()
+				.add(
+					TestAttribute::Strength,
+					AttributeInstance::builder(Attribute::Value(1.0)).modifier(
+						TestModifier::Buff,
+						AttributeModifier::new(1.0, Operation::Add),
+					),
+				)
+				.add(TestAttribute::Agility, Attribute::Value(2.0))
+				.build(),
+		)
+	});
+
+	#[test]
+	fn test_new() {
+		let map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
+		assert!(map.supplier.is_some());
+		assert!(map.attributes.is_empty());
+	}
+
+	#[test]
+	fn test_default() {
+		let map: MockMap = AttributeMap::default();
+		assert!(map.supplier.is_none());
+		assert!(map.attributes.is_empty());
+	}
+
+	#[test]
+	fn test_has_attribute() {
+		let mut map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
+		let attr = TestAttribute::Strength;
+
+		assert!(!map.has_attribute(&attr));
+		map.set_raw_value(attr.clone(), 10.0);
+		assert!(map.has_attribute(&attr));
+	}
+
+	#[test]
+	fn test_add_and_remove_modifier() {
+		let mut map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
+		let attr = TestAttribute::Strength;
+		let modifier = TestModifier::Buff;
+		let mod_instance = AttributeModifier::new(5.0, Operation::Add);
+
+		assert!(!map.has_modifier(&attr, &modifier));
+
+		map.add_modifier(attr.clone(), modifier.clone(), mod_instance);
+		assert!(map.has_modifier(&attr, &modifier));
+
+		map.remove_modifier(&attr, &modifier);
+		assert!(!map.has_modifier(&attr, &modifier));
+	}
+
+	#[test]
+	fn test_set_raw_value() {
+		let mut map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
+		let attr = TestAttribute::Agility;
+
+		map.set_raw_value(attr.clone(), 15.0);
+		assert_eq!(map.base_value(&attr), Some(15.0));
+	}
+
+	#[test]
+	fn test_value_computation() {
+		let map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
+
+		let value = map.value(&TestAttribute::Strength);
+		assert_eq!(value, Some(2.0));
+
+		let base_value = map.base_value(&TestAttribute::Strength);
+		assert_eq!(base_value, Some(1.0));
+	}
+
+	#[test]
+	fn test_remove_modifiers() {
+		let mut map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
+		let attr1 = TestAttribute::Strength;
+		let attr2 = TestAttribute::Agility;
+		let modifier = TestModifier::Buff;
+		let mod_instance = AttributeModifier::new(5.0, Operation::Add);
+
+		map.add_modifier(attr1.clone(), modifier.clone(), mod_instance.clone());
+		map.add_modifier(attr2.clone(), modifier.clone(), mod_instance);
+
+		assert!(map.has_modifier(&attr1, &modifier));
+		assert!(map.has_modifier(&attr2, &modifier));
+
+		map.remove_modifiers(&modifier);
+
+		assert!(!map.has_modifier(&attr1, &modifier));
+		assert!(!map.has_modifier(&attr2, &modifier));
 	}
 }
