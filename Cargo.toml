@@ -2,6 +2,7 @@
 name = "systema"
 version = "0.1.0"
 edition = "2024"
+license = "MPL-2"
 
 [features]
 serde = ["dep:serde"]
