@@ -42,9 +42,9 @@ mod tests {
 
 	#[test]
 	fn wwww() {
-		psize_of!(attribute::map::AttributeMap<&str, &str, u8>);
-
-		psize_of!(AttributeInstance<&str, &str, u8>);
+		// psize_of!(attribute::map::AttributeMap<&str, &str, u8>);
+		//
+		// psize_of!(AttributeInstance<&str, &str, u8>);
 
 		psize_of!(HashMap<&str, AttributeModifier<&str, u8>>);
 		psize_of!(Vec<(&str, AttributeModifier<&str, u8>)>);

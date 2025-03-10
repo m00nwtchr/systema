@@ -106,12 +106,14 @@ mod tests {
 	use crate::prelude::{Attribute, AttributeModifier, Operation};
 
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 	enum TestAttribute {
 		Strength,
 		Agility,
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 	enum TestModifier {
 		Buff,
 	}

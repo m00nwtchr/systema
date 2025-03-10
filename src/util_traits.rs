@@ -17,8 +17,7 @@ pub trait SerdeSupport {}
 impl<T> SerdeSupport for T {}
 
 pub trait Number:
-	SerdeSupport
-	+ Copy
+	Copy
 	+ PartialEq
 	+ PartialOrd
 	+ Default
@@ -29,8 +28,7 @@ pub trait Number:
 }
 
 impl<T> Number for T where
-	T: SerdeSupport
-		+ Copy
+	T: Copy
 		+ PartialEq
 		+ PartialOrd
 		+ Default
@@ -40,5 +38,5 @@ impl<T> Number for T where
 {
 }
 
-pub trait Key: Clone + PartialEq + Eq + Hash + SerdeSupport {}
-impl<T> Key for T where T: Clone + PartialEq + Eq + Hash + SerdeSupport {}
+pub trait Key: Clone + PartialEq + Eq + Hash {}
+impl<T> Key for T where T: Clone + PartialEq + Eq + Hash {}

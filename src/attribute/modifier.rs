@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::util_traits::Number;
 
 pub trait CloneableFn<V>: Fn(V, V) -> V + Send + Sync {
@@ -29,7 +31,10 @@ impl<'a, V: 'a> Clone for Box<dyn 'a + CloneableFn<V>> {
 pub enum Operation<V: 'static> {
 	Add,
 	Sub,
+	#[cfg(not(feature = "serde"))]
 	Fn(Box<dyn CloneableFn<V>>),
+	#[cfg(feature = "serde")]
+	Phantom(PhantomData<V>),
 }
 
 impl<V: Number + 'static> Operation<V> {
@@ -37,7 +42,10 @@ impl<V: Number + 'static> Operation<V> {
 		match self {
 			Self::Add => a + b,
 			Self::Sub => a - b,
+			#[cfg(not(feature = "serde"))]
 			Self::Fn(f) => f(a, b),
+			#[cfg(feature = "serde")]
+			Phantom => panic!(),
 		}
 	}
 }
@@ -47,7 +55,10 @@ impl<V: 'static> std::fmt::Debug for Operation<V> {
 		match self {
 			Operation::Add => write!(f, "Operation::Add"),
 			Operation::Sub => write!(f, "Operation::Sub"),
+			#[cfg(not(feature = "serde"))]
 			Operation::Fn(_) => write!(f, "Operation::Fn)"),
+			#[cfg(feature = "serde")]
+			Phantom => panic!(),
 		}
 	}
 }
@@ -57,6 +68,7 @@ impl<V: 'static> PartialEq for Operation<V> {
 		match (self, other) {
 			(Operation::Add, Operation::Add) => true,
 			(Operation::Sub, Operation::Sub) => true,
+			#[cfg(not(feature = "serde"))]
 			(Operation::Fn(_), Operation::Fn(_)) => false, // Can't compare function pointers meaningfully
 			_ => false,
 		}
@@ -148,10 +160,12 @@ mod tests {
 
 	#[test]
 	fn test_operations() {
+		#[cfg(not(feature = "serde"))]
 		let min = Operation::Fn(Box::new(i32::min));
 		let add = Operation::Add;
 		let sub = Operation::Sub;
 
+		#[cfg(not(feature = "serde"))]
 		assert_eq!(min.apply(7, 10), 7);
 		assert_eq!(add.apply(2, 8), 10);
 		assert_eq!(sub.apply(5, 3), 2);
@@ -159,11 +173,14 @@ mod tests {
 
 	#[test]
 	fn test_operation_debug() {
+		#[cfg(not(feature = "serde"))]
 		let min: Operation<i32> = Operation::Fn(Box::new(i32::min));
 		let add: Operation<i32> = Operation::Add;
 		let sub: Operation<i32> = Operation::Sub;
 
-		assert_ne!(format!("{min:?} {add:?} {sub:?}"), "");
+		assert_ne!(format!("{add:?} {sub:?}"), "");
+		#[cfg(not(feature = "serde"))]
+		assert_ne!(format!("{min:?}"), "");
 	}
 
 	#[test]
@@ -173,14 +190,18 @@ mod tests {
 		let sub_op1 = Operation::Sub;
 		let sub_op2 = Operation::Sub;
 
+		#[cfg(not(feature = "serde"))]
 		let fn_op1 = Operation::Fn(Box::new(|a, b| a + b));
+		#[cfg(not(feature = "serde"))]
 		let fn_op2 = Operation::Fn(Box::new(|a, b| a + b));
 
 		assert_eq!(add_op1, add_op2);
 		assert_ne!(add_op1, sub_op1);
 		assert_eq!(sub_op1, sub_op2);
 
+		#[cfg(not(feature = "serde"))]
 		assert_ne!(fn_op1, sub_op2);
+		#[cfg(not(feature = "serde"))]
 		assert_ne!(fn_op1, fn_op2);
 	}
 }

@@ -174,6 +174,7 @@ impl Actor for MockActor {
 				_self.form = Some(Form::Hishu);
 				_self.set_form(Form::Hishu);
 
+				#[cfg(not(feature = "serde"))]
 				_self.attributes.add_modifier(
 					AttributeKey::MaxHealth,
 					ModifierKey::WarriorsHide,
@@ -210,14 +211,14 @@ impl System for MockSystem {
 }
 
 #[derive(PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ActorKind {
 	Wizard,
 	Werewolf,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AttributeKey {
 	MaxHealth,
 	Speed,
@@ -232,7 +233,7 @@ pub enum AttributeKey {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Form {
 	Hishu,
 	Dalu,
@@ -242,13 +243,13 @@ pub enum Form {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Renown {
 	Purity,
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ModifierKey {
 	Form(Form),
 	WarriorsHide,

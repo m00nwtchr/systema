@@ -9,7 +9,7 @@ use crate::{
 	util_traits::{Key, Number},
 };
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // #[derive(Clone)]
 pub struct AttributeInstance<A, M, V = f32>
 where
@@ -17,9 +17,9 @@ where
 	M: Key,
 	V: Number + 'static,
 {
-	#[cfg_attr(feature = "serde", serde(skip))]
+	// #[cfg_attr(feature = "serde", serde(skip))]
 	attribute: Attribute<V>,
-	#[cfg_attr(feature = "serde", serde(skip))]
+	// #[cfg_attr(feature = "serde", serde(skip))]
 	modifiers: Vec<(M, AttributeModifier<A, V>)>,
 
 	raw_value: V,
@@ -198,6 +198,10 @@ where
 		self.modifiers.push((key, modifier));
 		self
 	}
+
+	// pub fn attribute(mut self, attr: A, modifier: AttributeModifier<A, V>) -> Self {
+	// 	self.modifier()
+	// }
 }
 
 impl<A, M, V> From<AttributeBuilder<A, M, V>> for AttributeInstance<A, M, V>
@@ -227,6 +231,7 @@ mod tests {
 	};
 
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 	struct TestKey(&'static str);
 
 	#[test]

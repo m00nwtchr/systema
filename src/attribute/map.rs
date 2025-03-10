@@ -10,14 +10,20 @@ use crate::{
 	util_traits::{Key, Number},
 };
 
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg(feature = "serde")]
+fn sp_default<A: Key, M: Key, V: Number + 'static>() -> Option<Arc<AttributeSupplier<A, M, V>>> {
+	None
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, derive_more::Debug)]
 pub struct AttributeMap<A, M, V = f32>
 where
 	A: Key + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
 {
-	#[cfg_attr(feature = "serde", serde(skip))]
+	#[cfg_attr(feature = "serde", serde(skip, default = "sp_default"))]
 	supplier: Option<Arc<AttributeSupplier<A, M, V>>>,
 	attributes: HashMap<A, AttributeInstance<A, M, V>>,
 }
@@ -163,12 +169,14 @@ mod tests {
 	use crate::prelude::{Attribute, Operation};
 
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 	enum TestAttribute {
 		Strength,
 		Agility,
 	}
 
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+	#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 	enum TestModifier {
 		Buff,
 	}
