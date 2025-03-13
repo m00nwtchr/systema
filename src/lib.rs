@@ -19,6 +19,7 @@ pub mod prelude {
 		<S as System>::AttributeKey,
 		<S as System>::ModifierKey,
 		<S as System>::AttributeValue,
+		<S as System>::Operation,
 	>;
 
 	// pub type AttributeSupplier<S> = crate::attribute::supplier::AttributeSupplier<

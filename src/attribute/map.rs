@@ -5,8 +5,11 @@ use std::{
 
 use crate::{
 	attribute::{
-		instance::AttributeInstance, modifier::AttributeModifier, supplier::AttributeSupplier,
+		instance::AttributeInstance,
+		modifier::{AttributeModifier, Op},
+		supplier::AttributeSupplier,
 	},
+	prelude::Operation,
 	util_traits::{Key, Number},
 };
 
@@ -17,24 +20,26 @@ fn sp_default<A: Key, M: Key, V: Number + 'static>() -> Option<Arc<AttributeSupp
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, derive_more::Debug)]
-pub struct AttributeMap<A, M, V = f32>
+pub struct AttributeMap<A, M, V = f32, O = Operation>
 where
 	A: Key + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	#[cfg_attr(feature = "serde", serde(skip, default = "sp_default"))]
-	supplier: Option<Arc<AttributeSupplier<A, M, V>>>,
-	attributes: HashMap<A, AttributeInstance<A, M, V>>,
+	supplier: Option<Arc<AttributeSupplier<A, M, V, O>>>,
+	attributes: HashMap<A, AttributeInstance<A, M, V, O>>,
 }
 
-impl<A, M, V> AttributeMap<A, M, V>
+impl<A, M, V, O> AttributeMap<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	pub fn new(supplier: Arc<AttributeSupplier<A, M, V>>) -> Self {
+	pub fn new(supplier: Arc<AttributeSupplier<A, M, V, O>>) -> Self {
 		AttributeMap {
 			supplier: Some(supplier),
 			attributes: HashMap::new(),
@@ -55,7 +60,7 @@ where
 		&mut self,
 		attribute: A,
 		modifier: M,
-		instance: AttributeModifier<A, V>,
+		instance: AttributeModifier<A, V, O>,
 	) -> &mut Self {
 		if let Some(attr) = self.get_mut(attribute.clone()) {
 			attr.add_modifier(modifier, instance);
@@ -129,7 +134,7 @@ where
 		}
 	}
 
-	fn get_mut(&mut self, attribute: A) -> Option<&mut AttributeInstance<A, M, V>> {
+	fn get_mut(&mut self, attribute: A) -> Option<&mut AttributeInstance<A, M, V, O>> {
 		let entry = self.attributes.entry(attribute);
 
 		match entry {
@@ -147,11 +152,12 @@ where
 	}
 }
 
-impl<A, M, V> Default for AttributeMap<A, M, V>
+impl<A, M, V, O> Default for AttributeMap<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	fn default() -> Self {
 		AttributeMap {
