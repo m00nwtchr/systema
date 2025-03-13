@@ -1,6 +1,6 @@
-mod actor;
-mod attribute;
-mod system;
+pub mod actor;
+pub mod attribute;
+pub mod system;
 mod util_traits;
 
 pub mod prelude {
