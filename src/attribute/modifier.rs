@@ -114,6 +114,14 @@ impl<A, V> AttributeModifier<A, V> {
 		}
 	}
 
+	pub const fn new_const(value: Value<A, V>, op: Operation<V>) -> Self {
+		Self {
+			value,
+			op,
+			base: false,
+		}
+	}
+
 	pub fn base(mut self) -> Self {
 		self.base = true;
 		self
