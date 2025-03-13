@@ -174,17 +174,17 @@ impl Actor for MockActor {
 				_self.form = Some(Form::Hishu);
 				_self.set_form(Form::Hishu);
 
-				#[cfg(not(feature = "serde"))]
-				_self.attributes.add_modifier(
-					AttributeKey::MaxHealth,
-					ModifierKey::WarriorsHide,
-					AttributeModifier::new(
-						Value::Attribute(AttributeKey::Renown(Renown::Purity)),
-						Operation::Fn(Box::new(
-							|v, renown| if renown >= 2 { v + renown } else { v },
-						)),
-					),
-				);
+				// #[cfg(not(feature = "serde"))]
+				// _self.attributes.add_modifier(
+				// 	AttributeKey::MaxHealth,
+				// 	ModifierKey::WarriorsHide,
+				// 	AttributeModifier::new(
+				// 		Value::Attribute(AttributeKey::Renown(Renown::Purity)),
+				// 		Operation::Fn(Box::new(
+				// 			|v, renown| if renown >= 2 { v + renown } else { v },
+				// 		)),
+				// 	),
+				// );
 			}
 		}
 

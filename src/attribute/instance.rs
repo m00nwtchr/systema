@@ -4,34 +4,37 @@ use crate::{
 	attribute::{
 		Attribute,
 		map::AttributeMap,
-		modifier::{AttributeModifier, Value},
+		modifier::{AttributeModifier, Op, Value},
 	},
+	prelude::Operation,
 	util_traits::{Key, Number},
 };
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // #[derive(Clone)]
-pub struct AttributeInstance<A, M, V = f32>
+pub struct AttributeInstance<A, M, V = f32, O = Operation>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	// #[cfg_attr(feature = "serde", serde(skip))]
 	attribute: Attribute<V>,
 	// #[cfg_attr(feature = "serde", serde(skip))]
-	modifiers: Vec<(M, AttributeModifier<A, V>)>,
+	modifiers: Vec<(M, AttributeModifier<A, V, O>)>,
 
 	raw_value: V,
 	#[cfg_attr(feature = "serde", serde(skip))]
 	cached_value: Mutex<Option<V>>,
 }
 
-impl<A, M, V> Clone for AttributeInstance<A, M, V>
+impl<A, M, V, O> Clone for AttributeInstance<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	fn clone(&self) -> Self {
 		Self {
@@ -43,11 +46,12 @@ where
 	}
 }
 
-impl<A, M, V> AttributeInstance<A, M, V>
+impl<A, M, V, O> AttributeInstance<A, M, V, O>
 where
-	M: Key,
 	A: Key,
+	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	pub fn new(attribute: Attribute<V>) -> Self {
 		let raw_value = attribute.default_value();
@@ -59,7 +63,7 @@ where
 		}
 	}
 
-	pub fn builder(attribute: Attribute<V>) -> AttributeBuilder<A, M, V> {
+	pub fn builder(attribute: Attribute<V>) -> AttributeBuilder<A, M, V, O> {
 		AttributeBuilder {
 			attribute,
 			modifiers: Vec::new(),
@@ -81,7 +85,7 @@ where
 		}
 	}
 
-	pub(super) fn compute_value(&self, attributes: &AttributeMap<A, M, V>, base: bool) -> V {
+	pub(super) fn compute_value(&self, attributes: &AttributeMap<A, M, V, O>, base: bool) -> V {
 		let mut value = self.raw_value;
 
 		for (_, modifier) in &self.modifiers {
@@ -96,8 +100,8 @@ where
 	fn apply_modifier(
 		&self,
 		value: V,
-		modifier: &AttributeModifier<A, V>,
-		attributes: &AttributeMap<A, M, V>,
+		modifier: &AttributeModifier<A, V, O>,
+		attributes: &AttributeMap<A, M, V, O>,
 	) -> V {
 		let mod_val = match &modifier.value {
 			Value::Value(val) => *val,
@@ -107,11 +111,11 @@ where
 		modifier.op.apply(value, mod_val)
 	}
 
-	pub fn base_value(&self, attributes: &AttributeMap<A, M, V>) -> V {
+	pub fn base_value(&self, attributes: &AttributeMap<A, M, V, O>) -> V {
 		self.compute_value(attributes, true)
 	}
 
-	pub fn value(&self, attributes: &AttributeMap<A, M, V>) -> V {
+	pub fn value(&self, attributes: &AttributeMap<A, M, V, O>) -> V {
 		let mut cached_value = self.cached_value.lock();
 		match *cached_value {
 			None => {
@@ -126,14 +130,14 @@ where
 	pub fn has_modifier(&self, modifier: &M) -> bool {
 		self.modifiers.iter().any(|(m, _)| modifier.eq(m))
 	}
-	pub fn modifier(&self, modifier: &M) -> Option<&AttributeModifier<A, V>> {
+	pub fn modifier(&self, modifier: &M) -> Option<&AttributeModifier<A, V, O>> {
 		self.modifiers
 			.iter()
 			.find(|(m, _)| modifier.eq(m))
 			.map(|(_, v)| v)
 	}
 
-	pub fn add_modifier(&mut self, id: M, modifier: AttributeModifier<A, V>) {
+	pub fn add_modifier(&mut self, id: M, modifier: AttributeModifier<A, V, O>) {
 		self.modifiers.push((id, modifier));
 		self.mark_dirty();
 	}
@@ -156,45 +160,49 @@ where
 	}
 }
 
-impl<A, M, V> From<Attribute<V>> for AttributeInstance<A, M, V>
+impl<A, M, V, O> From<Attribute<V>> for AttributeInstance<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	fn from(value: Attribute<V>) -> Self {
 		Self::new(value)
 	}
 }
 
-impl<A, M, V> Default for AttributeInstance<A, M, V>
+impl<A, M, V, O> Default for AttributeInstance<A, M, V, O>
 where
 	M: Key,
 	A: Key,
 	V: Default + Number,
+	O: Op<V>,
 {
 	fn default() -> Self {
 		AttributeInstance::new(Attribute::Value(V::default()))
 	}
 }
 
-pub struct AttributeBuilder<A, M, V = f32>
+pub struct AttributeBuilder<A, M, V = f32, O = Operation>
 where
 	A: Key + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	attribute: Attribute<V>,
-	modifiers: Vec<(M, AttributeModifier<A, V>)>,
+	modifiers: Vec<(M, AttributeModifier<A, V, O>)>,
 }
 
-impl<A, M, V> AttributeBuilder<A, M, V>
+impl<A, M, V, O> AttributeBuilder<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	pub fn modifier(mut self, key: M, modifier: AttributeModifier<A, V>) -> Self {
+	pub fn modifier(mut self, key: M, modifier: AttributeModifier<A, V, O>) -> Self {
 		self.modifiers.push((key, modifier));
 		self
 	}
@@ -204,13 +212,14 @@ where
 	// }
 }
 
-impl<A, M, V> From<AttributeBuilder<A, M, V>> for AttributeInstance<A, M, V>
+impl<A, M, V, O> From<AttributeBuilder<A, M, V, O>> for AttributeInstance<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	fn from(value: AttributeBuilder<A, M, V>) -> Self {
+	fn from(value: AttributeBuilder<A, M, V, O>) -> Self {
 		let raw_value = value.attribute.default_value();
 		Self {
 			attribute: value.attribute,

@@ -1,32 +1,35 @@
 use std::collections::HashMap;
 
 use crate::{
-	attribute::{instance::AttributeInstance, map::AttributeMap},
+	attribute::{instance::AttributeInstance, map::AttributeMap, modifier::Op},
+	prelude::Operation,
 	util_traits::{Key, Number},
 };
 
-pub struct AttributeSupplierBuilder<A, M, V>
+pub struct AttributeSupplierBuilder<A, M, V, O = Operation>
 where
 	A: Key + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	instances: HashMap<A, AttributeInstance<A, M, V>>,
+	instances: HashMap<A, AttributeInstance<A, M, V, O>>,
 }
 
-impl<A, M, V> AttributeSupplierBuilder<A, M, V>
+impl<A, M, V, O> AttributeSupplierBuilder<A, M, V, O>
 where
 	A: Key + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	pub fn build(self) -> AttributeSupplier<A, M, V> {
+	pub fn build(self) -> AttributeSupplier<A, M, V, O> {
 		AttributeSupplier {
 			instances: self.instances,
 		}
 	}
 
-	pub fn add<I: Into<A>, AI: Into<AttributeInstance<A, M, V>>>(
+	pub fn add<I: Into<A>, AI: Into<AttributeInstance<A, M, V, O>>>(
 		mut self,
 		id: I,
 		attribute: AI,
@@ -36,28 +39,30 @@ where
 	}
 }
 
-pub struct AttributeSupplier<A, M, V = f32>
+pub struct AttributeSupplier<A, M, V = f32, O = Operation>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	instances: HashMap<A, AttributeInstance<A, M, V>>,
+	instances: HashMap<A, AttributeInstance<A, M, V, O>>,
 }
 
-impl<A, M, V> AttributeSupplier<A, M, V>
+impl<A, M, V, O> AttributeSupplier<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
-	pub fn builder() -> AttributeSupplierBuilder<A, M, V> {
+	pub fn builder() -> AttributeSupplierBuilder<A, M, V, O> {
 		AttributeSupplierBuilder {
 			instances: HashMap::new(),
 		}
 	}
 
-	pub fn create_instance(&self, attribute: &A) -> Option<AttributeInstance<A, M, V>> {
+	pub fn create_instance(&self, attribute: &A) -> Option<AttributeInstance<A, M, V, O>> {
 		self.instances.get(attribute).cloned()
 	}
 
@@ -65,7 +70,7 @@ where
 	// 	self.instances.contains_key(attribute)
 	// }
 
-	pub(crate) fn value(&self, attribute: &A, attributes: &AttributeMap<A, M, V>) -> Option<V> {
+	pub(crate) fn value(&self, attribute: &A, attributes: &AttributeMap<A, M, V, O>) -> Option<V> {
 		self.instances
 			.get(attribute)
 			.map(|attr| attr.compute_value(attributes, false))
@@ -74,7 +79,7 @@ where
 	pub(crate) fn base_value(
 		&self,
 		attribute: &A,
-		attributes: &AttributeMap<A, M, V>,
+		attributes: &AttributeMap<A, M, V, O>,
 	) -> Option<V> {
 		self.instances
 			.get(attribute)
@@ -85,11 +90,12 @@ where
 	// }
 }
 
-impl<A, M, V> Default for AttributeSupplier<A, M, V>
+impl<A, M, V, O> Default for AttributeSupplier<A, M, V, O>
 where
 	A: Key,
 	M: Key,
 	V: Number + 'static,
+	O: Op<V>,
 {
 	fn default() -> Self {
 		Self {
