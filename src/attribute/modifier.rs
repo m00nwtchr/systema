@@ -1,4 +1,4 @@
-use crate::util_traits::Number;
+use crate::util_traits::{Number, SerdeSupport};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
@@ -16,7 +16,7 @@ impl<V: Number + 'static> Op<V> for Operation {
 	}
 }
 
-pub trait Op<V>: Clone {
+pub trait Op<V>: Clone + SerdeSupport {
 	fn apply(&self, a: V, b: V) -> V;
 }
 
