@@ -14,7 +14,8 @@ use crate::{
 };
 
 #[cfg(feature = "serde")]
-fn sp_default<A: Key, M: Key, V: Number + 'static>() -> Option<Arc<AttributeSupplier<A, M, V>>> {
+fn sp_default<A: Key, M: Key, V: Number + 'static, O: Op<V>>()
+-> Option<Arc<AttributeSupplier<A, M, V, O>>> {
 	None
 }
 
