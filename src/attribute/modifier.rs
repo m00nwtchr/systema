@@ -28,6 +28,7 @@ pub enum Value<A, V> {
 }
 
 impl<A: PartialEq, V> Value<A, V> {
+	#[allow(clippy::match_wildcard_for_single_variants)]
 	pub fn is_attribute(&self, attr: &A) -> bool {
 		match self {
 			Self::Attribute(a) => a.eq(attr),
@@ -67,6 +68,7 @@ impl<A, V, O: Op<V>> AttributeModifier<A, V, O> {
 		}
 	}
 
+	#[must_use]
 	pub fn base(mut self) -> Self {
 		self.base = true;
 		self

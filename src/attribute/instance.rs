@@ -90,7 +90,7 @@ where
 
 		for (_, modifier) in &self.modifiers {
 			if !base || modifier.base {
-				value = self.apply_modifier(value, modifier, attributes);
+				value = Self::apply_modifier(value, modifier, attributes);
 			}
 		}
 
@@ -98,7 +98,6 @@ where
 	}
 
 	fn apply_modifier(
-		&self,
 		value: V,
 		modifier: &AttributeModifier<A, V, O>,
 		attributes: &AttributeMap<A, M, V, O>,
@@ -145,11 +144,11 @@ where
 	pub fn remove_modifier(&mut self, id: &M) -> bool {
 		let l1 = self.modifiers.len();
 		self.modifiers.retain(|(m, _)| id.ne(m));
-		if self.modifiers.len() != l1 {
+		if self.modifiers.len() == l1 {
+			false
+		} else {
 			self.mark_dirty();
 			true
-		} else {
-			false
 		}
 	}
 
@@ -184,6 +183,7 @@ where
 	}
 }
 
+#[must_use]
 pub struct AttributeBuilder<A, M, V = f32, O = Operation>
 where
 	A: Key + 'static,

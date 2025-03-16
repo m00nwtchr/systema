@@ -40,6 +40,7 @@ where
 	V: Number + 'static,
 	O: Op<V>,
 {
+	#[must_use]
 	pub fn new(supplier: Arc<AttributeSupplier<A, M, V, O>>) -> Self {
 		AttributeMap {
 			supplier: Some(supplier),
@@ -59,13 +60,13 @@ where
 
 	pub fn add_modifier(
 		&mut self,
-		attribute: A,
+		attribute: &A,
 		modifier: M,
 		instance: AttributeModifier<A, V, O>,
 	) -> &mut Self {
 		if let Some(attr) = self.get_mut(attribute.clone()) {
 			attr.add_modifier(modifier, instance);
-			self.mark_dependents_dirty(&attribute);
+			self.mark_dependents_dirty(attribute);
 		}
 
 		self
@@ -96,10 +97,10 @@ where
 		}
 	}
 
-	pub fn set_raw_value(&mut self, attribute: A, value: V) {
+	pub fn set_raw_value(&mut self, attribute: &A, value: V) {
 		if let Some(attr) = self.get_mut(attribute.clone()) {
 			attr.set_raw_value(value);
-			self.mark_dependents_dirty(&attribute);
+			self.mark_dependents_dirty(attribute);
 		}
 	}
 
@@ -226,7 +227,7 @@ mod tests {
 		let attr = TestAttribute::Strength;
 
 		assert!(!map.has_attribute(&attr));
-		map.set_raw_value(attr.clone(), 10.0);
+		map.set_raw_value(&attr, 10.0);
 		assert!(map.has_attribute(&attr));
 	}
 
@@ -239,7 +240,7 @@ mod tests {
 
 		assert!(!map.has_modifier(&attr, &modifier));
 
-		map.add_modifier(attr.clone(), modifier.clone(), mod_instance);
+		map.add_modifier(&attr, modifier.clone(), mod_instance);
 		assert!(map.has_modifier(&attr, &modifier));
 
 		map.remove_modifier(&attr, &modifier);
@@ -251,7 +252,7 @@ mod tests {
 		let mut map: MockMap = AttributeMap::new(ATTRIBUTES.clone());
 		let attr = TestAttribute::Agility;
 
-		map.set_raw_value(attr.clone(), 15.0);
+		map.set_raw_value(&attr, 15.0);
 		assert_eq!(map.base_value(&attr), Some(15.0));
 	}
 
@@ -274,8 +275,8 @@ mod tests {
 		let modifier = TestModifier::Buff;
 		let mod_instance = AttributeModifier::new(5.0, Operation::Add);
 
-		map.add_modifier(attr1.clone(), modifier.clone(), mod_instance.clone());
-		map.add_modifier(attr2.clone(), modifier.clone(), mod_instance);
+		map.add_modifier(&attr1, modifier.clone(), mod_instance.clone());
+		map.add_modifier(&attr2, modifier.clone(), mod_instance);
 
 		assert!(map.has_modifier(&attr1, &modifier));
 		assert!(map.has_modifier(&attr2, &modifier));

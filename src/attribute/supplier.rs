@@ -6,6 +6,7 @@ use crate::{
 	util_traits::{Key, Number},
 };
 
+#[must_use]
 pub struct AttributeSupplierBuilder<A, M, V, O = Operation>
 where
 	A: Key + 'static,
@@ -23,6 +24,7 @@ where
 	V: Number + 'static,
 	O: Op<V>,
 {
+	#[must_use]
 	pub fn build(self) -> AttributeSupplier<A, M, V, O> {
 		AttributeSupplier {
 			instances: self.instances,

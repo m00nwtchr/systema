@@ -38,17 +38,15 @@ where
 {
 	pub fn default_value(&self) -> V {
 		match self {
-			Self::Value(d) => *d,
-			Self::Ranged(d, _, _) => *d,
+			Self::Ranged(d, _, _) | Self::Value(d) => *d,
 			Self::Derived => V::default(),
 		}
 	}
 
 	pub fn sanitize_value(&self, value: V) -> V {
 		match self {
-			Self::Value(_) => value,
 			Self::Ranged(_, min, max) => clamp(value, *min, *max),
-			Self::Derived => value,
+			_ => value,
 		}
 	}
 }

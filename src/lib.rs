@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 pub mod actor;
 pub mod attribute;
 pub mod system;
@@ -33,7 +35,7 @@ pub mod prelude {
 mod tests {
 	use std::collections::HashMap;
 
-	use super::{prelude::*, *};
+	use super::prelude::*;
 
 	macro_rules! psize_of {
 		($t:ty) => {
