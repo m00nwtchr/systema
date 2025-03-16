@@ -38,5 +38,5 @@ impl<T> Number for T where
 {
 }
 
-pub trait Key: Clone + PartialEq + Eq + Hash {}
-impl<T> Key for T where T: Clone + PartialEq + Eq + Hash {}
+pub trait Key: Clone + PartialEq + Eq {}
+impl<T> Key for T where T: Clone + PartialEq + Eq {}

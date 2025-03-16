@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
 	attribute::{instance::AttributeInstance, map::AttributeMap, modifier::Op},
@@ -9,7 +9,7 @@ use crate::{
 #[must_use]
 pub struct AttributeSupplierBuilder<A, M, V, O = Operation>
 where
-	A: Key + 'static,
+	A: Key + Hash + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
 	O: Op<V>,
@@ -19,7 +19,7 @@ where
 
 impl<A, M, V, O> AttributeSupplierBuilder<A, M, V, O>
 where
-	A: Key + 'static,
+	A: Key + Hash + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
 	O: Op<V>,
@@ -43,7 +43,7 @@ where
 
 pub struct AttributeSupplier<A, M, V = f32, O = Operation>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -53,7 +53,7 @@ where
 
 impl<A, M, V, O> AttributeSupplier<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -94,7 +94,7 @@ where
 
 impl<A, M, V, O> Default for AttributeSupplier<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,

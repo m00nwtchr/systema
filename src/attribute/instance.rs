@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use parking_lot::Mutex;
 
 use crate::{
@@ -14,7 +16,7 @@ use crate::{
 // #[derive(Clone)]
 pub struct AttributeInstance<A, M, V = f32, O = Operation>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -31,7 +33,7 @@ where
 
 impl<A, M, V, O> Clone for AttributeInstance<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -48,7 +50,7 @@ where
 
 impl<A, M, V, O> AttributeInstance<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -161,7 +163,7 @@ where
 
 impl<A, M, V, O> From<Attribute<V>> for AttributeInstance<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -174,7 +176,7 @@ where
 impl<A, M, V, O> Default for AttributeInstance<A, M, V, O>
 where
 	M: Key,
-	A: Key,
+	A: Key + Hash,
 	V: Default + Number,
 	O: Op<V>,
 {
@@ -186,7 +188,7 @@ where
 #[must_use]
 pub struct AttributeBuilder<A, M, V = f32, O = Operation>
 where
-	A: Key + 'static,
+	A: Key + Hash + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
 	O: Op<V>,
@@ -197,7 +199,7 @@ where
 
 impl<A, M, V, O> AttributeBuilder<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -214,7 +216,7 @@ where
 
 impl<A, M, V, O> From<AttributeBuilder<A, M, V, O>> for AttributeInstance<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,

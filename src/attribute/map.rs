@@ -1,5 +1,6 @@
 use std::{
 	collections::{HashMap, hash_map::Entry},
+	hash::Hash,
 	sync::Arc,
 };
 
@@ -14,7 +15,7 @@ use crate::{
 };
 
 #[cfg(feature = "serde")]
-fn sp_default<A: Key, M: Key, V: Number + 'static, O: Op<V>>()
+fn sp_default<A: Key + Hash, M: Key, V: Number + 'static, O: Op<V>>()
 -> Option<Arc<AttributeSupplier<A, M, V, O>>> {
 	None
 }
@@ -23,7 +24,7 @@ fn sp_default<A: Key, M: Key, V: Number + 'static, O: Op<V>>()
 #[derive(Clone, derive_more::Debug)]
 pub struct AttributeMap<A, M, V = f32, O = Operation>
 where
-	A: Key + 'static,
+	A: Key + Hash + 'static,
 	M: Key + 'static,
 	V: Number + 'static,
 	O: Op<V>,
@@ -35,7 +36,7 @@ where
 
 impl<A, M, V, O> AttributeMap<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
@@ -156,7 +157,7 @@ where
 
 impl<A, M, V, O> Default for AttributeMap<A, M, V, O>
 where
-	A: Key,
+	A: Key + Hash,
 	M: Key,
 	V: Number + 'static,
 	O: Op<V>,
