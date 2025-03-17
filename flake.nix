@@ -25,7 +25,12 @@
         devShells.default = with pkgs;
           mkShell {
             buildInputs = [
-              rustBin
+              (rustBin.override {
+                extensions = ["rust-docs" "rust-src" "clippy"];
+              })
+              (rust-bin.selectLatestNightlyWith (toolchain:
+                  toolchain.rustfmt))
+
               zsh
             ];
 
