@@ -1,18 +1,12 @@
 {
   description = "A devShell example";
-
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
-
   outputs = {
     self,
     nixpkgs,
@@ -26,14 +20,19 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+        rustBin = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       in {
         devShells.default = with pkgs;
           mkShell {
             buildInputs = [
-              llvmPackages_latest.llvm
-              rust-bin.stable.latest.default
+              rustBin
               zsh
             ];
+
+            env = {
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
+              RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
+            };
 
             shellHook = ''
               exec zsh
