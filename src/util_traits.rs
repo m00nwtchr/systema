@@ -1,7 +1,4 @@
-use std::{
-	hash::Hash,
-	ops::{Add, Sub},
-};
+use std::ops::{Add, Sub};
 
 // #[cfg(feature = "serde")]
 // use serde::{Serialize, de::DeserializeOwned};

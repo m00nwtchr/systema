@@ -107,6 +107,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
 	use std::sync::Arc;
 
@@ -195,7 +196,7 @@ mod tests {
 
 	#[test]
 	fn test_default_supplier() {
-		let supplier: MockSupplier = Default::default();
+		let supplier: MockSupplier = AttributeSupplier::default();
 		assert!(supplier.instances.is_empty());
 	}
 }
